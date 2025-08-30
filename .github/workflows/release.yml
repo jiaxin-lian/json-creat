@@ -1,0 +1,65 @@
+name: Build and Release (Electron)
+
+on:
+  push:
+    tags:
+      - 'v*'                 # 推送 v1.0.0 之类的 tag 时自动触发
+  workflow_dispatch:          # 也允许从 Actions 手动运行
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # 需要同时构建 .dmg 和 .exe 就保留两个；只要 .exe 则改成 [windows-latest]
+        os: [macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install deps
+        run: npm ci
+
+      # 如果你的前端需要单独打包（如 Vite/React/Vue），把下一行改成真实命令：
+      # 例如：npm run build ；若没有这步就注释/删除
+      - name: Build web assets
+        run: npm run build:web || echo "skip web build"
+
+      - name: Build Electron app (no auto publish)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # electron-builder 会用到
+        run: npx electron-builder --publish=never
+
+      # 可选：把构建产物也保存成工作流 artifact，便于下载排查
+      - name: Upload artifacts (optional)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-artifacts
+          path: |
+            dist/*.dmg
+            dist/*.exe
+            dist/*.zip
+            dist/*.AppImage
+          if-no-files-found: ignore
+
+      # 只有在 tag 触发时，才把文件挂到对应 Release
+      - name: Attach files to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.dmg
+            dist/*.exe
+            dist/*.zip
+            dist/*.AppImage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

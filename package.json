@@ -15,7 +15,7 @@
   },
   "build": {
     "appId": "com.example.mydesktopapp",
-    "productName": "MyDesktopApp",
+    "productName": "json生成器",
     "files": [
       "main.js",
       "preload.js",

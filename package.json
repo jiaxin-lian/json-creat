@@ -34,7 +34,6 @@
       "target": [
         "nsis"
       ],
-      "icon": "icons/icon.ico",
       "artifactName": "json生成器.exe"
     },
     "linux": {

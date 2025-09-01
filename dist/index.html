@@ -1,0 +1,830 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>创建JSON（用于修改辞书 units）</title>
+    <style>
+        body {
+            margin: 0;
+            padding: auto;
+        }
+
+        .container {
+            padding: 14px;
+            display: grid;
+            gap: 14px;
+        }
+
+        .title {
+            font-size: 22px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            box-shadow: 0 2px 24px rgba(2, 6, 23, .04);
+        }
+
+
+        .row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 8px 0;
+            flex-wrap: wrap;
+        }
+
+        label {
+            font-weight: 600;
+        }
+
+        input,
+        select,
+        textarea {
+            padding: 8px 10px;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+        }
+
+        input.wide,
+        textarea {
+            min-width: 420px;
+        }
+
+        button {
+            padding: 8px 12px;
+            border-radius: 10px;
+            border: 1px solid #e5e7eb;
+            background: #f8fafc;
+            cursor: pointer;
+        }
+
+        button.primary {
+            background: #2563eb;
+            color: #fff;
+            border-color: #2563eb;
+        }
+
+        button.danger {
+            background: #fee2e2;
+            border-color: #fecaca;
+            color: #991b1b;
+        }
+
+        button:disabled {
+            opacity: .6;
+            cursor: not-allowed;
+        }
+
+        .muted {
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        h2 {
+            margin: 0 0 8px;
+        }
+
+        .op-item {
+            border: 1px dashed #e5e7eb;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .op-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .op-head .spacer {
+            flex: 1;
+        }
+
+        .code {
+            background: #0b1020;
+            color: #d1e7ff;
+            border-radius: 10px;
+            padding: 10px;
+            overflow: auto;
+            font-size: 12px;
+            width: 100%;
+        }
+
+        .panel {
+            border: 1px dashed #e5e7eb;
+            border-radius: 10px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+
+        .panel h3 {
+            margin: 0 0 6px;
+            font-size: 14px;
+        }
+
+        .list-editor .mini-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 8px;
+            margin-top: 8px;
+            background: #fafafa;
+        }
+
+        nav {
+            background-color: var(--primary);
+            color: white;
+            padding: 16px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            margin-right: 24px;
+            font-weight: 500;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+
+        .nav-links a:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-links a.active {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .toast {
+            position: fixed;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #111827;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 8px;
+            z-index: 50;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <nav style="background-color: #2563eb;">
+        <div class="nav-container">
+            <div class="nav-links">
+                <a href="index.html" class="active">创建 JSON</a>
+                <a href="compare.html">比较 JSON</a>
+            </div>
+        </div>
+    </nav>
+    <div class="container">
+        <div class="card">
+            <h1 class="title">创建JSON（用于修改辞书 units）</h1>
+            <p class="muted">生成的 JSON 结构：<code>{ "ops": [ ... ] }</code>，可直接用于你的“应用补丁到预览”页面。</p>
+        </div>
+
+        <div class="card" id="form-card">
+            <div class="row">
+                <label>操作类型</label>
+                <select id="opType"></select>
+            </div>
+
+            <!-- addUnit -->
+            <div class="panel" id="panel-addUnit" style="display:none;">
+                <h3>addUnit</h3>
+                <div class="row">
+                    <label>unit.id（可选）</label>
+                    <input type="number" id="unit-id" placeholder="例如：3605（不填则自动生成）" />
+                </div>
+                <div class="row">
+                    <label>unit.title</label>
+                    <input id="unit-title" placeholder="例如：Unit 1" />
+                </div>
+
+                <details>
+                    <summary>编辑 unit.list（可选）</summary>
+                    <div class="list-editor">
+                        <button class="btn" id="btn-add-unit-item">+ 添加条目</button>
+                        <div id="unit-list"></div>
+                    </div>
+                </details>
+            </div>
+
+            <!-- rename/remove unit -->
+            <div class="panel" id="panel-rename-remove" style="display:none;">
+                <h3 id="label-rr"></h3>
+                <div class="row">
+                    <label>unitTitle</label>
+                    <input id="rr-unitTitle" placeholder="例如：Unit 2" />
+                </div>
+                <div class="row" id="row-toTitle" style="display:none;">
+                    <label>toTitle</label>
+                    <input id="rr-toTitle" placeholder="例如：Unit 2 (NEW)" />
+                </div>
+            </div>
+
+            <!-- items 公共段 -->
+            <div class="panel" id="panel-items" style="display:none;">
+                <h3 id="label-items"></h3>
+
+                <div class="row">
+                    <label>unitTitle</label>
+                    <input id="it-unitTitle" placeholder="例如：Unit 3" />
+                </div>
+
+                <!-- 需要 item 的 -->
+                <div id="section-item-fields" style="display:none;">
+                    <div class="row">
+                        <label>item.w</label><input id="item-w" />
+                    </div>
+                    <div class="row">
+                        <label>item.def</label><input id="item-def" class="wide" />
+                    </div>
+                </div>
+
+                <!-- 需要 by 的 -->
+                <div id="section-by" style="display:none;">
+                    <div class="row">
+                        <label>by.w</label><input id="by-w" />
+                    </div>
+                </div>
+
+                <!-- 位置 -->
+                <div class="row" id="section-pos" style="display:none;">
+                    <label>pos</label>
+                    <select id="pos"></select>
+                </div>
+
+                <!-- 指定 afterBy -->
+                <div class="row" id="section-afterBy" style="display:none;">
+                    <label>afterBy.w</label><input id="afterBy-w" />
+                </div>
+            </div>
+
+            <div class="row btns">
+                <button class="primary" id="btn-add">添加到列表</button>
+                <button id="btn-replace" disabled>覆盖当前项</button>
+                <button class="danger" id="btn-clear" disabled>清空</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>已添加的操作（ops）</h2>
+            <div class="muted" id="ops-empty">（空空如也，先在上面添加一些操作吧）</div>
+            <div id="ops-list"></div>
+        </div>
+
+        <div class="card">
+            <h2>导出</h2>
+            <div class="row">
+                <label>文件名</label>
+                <input id="file-name" value="units_ops_patch.json" />
+                <button class="primary" id="btn-download" disabled>下载 JSON</button>
+                <button id="btn-copy" disabled>复制 JSON</button>
+                <label><input type="checkbox" id="show-raw" /> 展开查看源码</label>
+            </div>
+            <pre class="code" id="raw-json" style="display:none;"></pre>
+        </div>
+
+        <div class="toast" id="toast"></div>
+    </div>
+
+    <script>
+        /** ====== 状态与常量 ====== */
+        const state = {
+            ops: [],
+            activeIdx: -1,
+            form: {
+                op: 'addUnit',
+                unit: { id: null, title: '', list: [] },
+                unitTitle: '',
+                toTitle: '',
+                item: { id: null, w: '', def: '', tid: '', f: null },
+                by: { id: null, w: '' },
+                afterBy: { id: null, w: '' },
+                pos: ''
+            }
+        };
+
+        const OP_TYPES = [
+            { v: 'addUnit', label: 'addUnit（新增/覆盖 unit）' },
+            { v: 'renameUnit', label: 'renameUnit（重命名 unit）' },
+            { v: 'removeUnit', label: 'removeUnit（删除 unit）' },
+            { v: 'upsertItem', label: 'upsertItem（存在则更改/移动，不在则插入）' },
+            { v: 'insertItemFirst', label: 'insertItemFirst（插到 unit 第一位）' },
+            { v: 'insertItemLast', label: 'insertItemLast（插到 unit 最后一位）' },
+            { v: 'insertItemAfter', label: 'insertItemAfter（插到指定单词之后）' },
+            { v: 'updateItem', label: 'updateItem（按条件更新并可移动）' },
+            { v: 'removeItem', label: 'removeItem（删除条目）' }
+        ];
+
+        const POS_OPTIONS = [
+            { v: '', label: '（不改变位置）' },
+            { v: 'first', label: 'first（移到第一位）' },
+            { v: 'last', label: 'last（移到最后）' },
+            { v: 'after', label: 'after（移到指定单词之后）' }
+        ];
+
+        /** ====== 工具 ====== */
+        const $ = (id) => document.getElementById(id);
+        const clone = (o) => JSON.parse(JSON.stringify(o));
+        const notEmpty = (s) => !!String(s ?? '').trim();
+        function toNumOrNull(v) { const s = String(v ?? '').trim(); if (s === '') return null; const n = Number(s); return Number.isFinite(n) ? n : null; }
+
+        function toast(s) {
+            const el = $('toast');
+            el.textContent = s;
+            el.style.display = 'block';
+            setTimeout(() => el.style.display = 'none', 2000);
+        }
+
+        /** ====== 校验 ====== */
+        function validate(op) {
+            switch (op.op) {
+                case 'addUnit':
+                    if (!notEmpty(op.unit?.title)) return 'addUnit：unit.title 不能为空';
+                    if (op.unit?.list && !Array.isArray(op.unit.list)) return 'addUnit：unit.list 必须为数组';
+                    return '';
+                case 'renameUnit':
+                    if (!notEmpty(op.unitTitle)) return 'renameUnit：unitTitle 不能为空';
+                    if (!notEmpty(op.toTitle)) return 'renameUnit：toTitle 不能为空';
+                    return '';
+                case 'removeUnit':
+                    if (!notEmpty(op.unitTitle)) return 'removeUnit：unitTitle 不能为空';
+                    return '';
+                case 'insertItemFirst':
+                case 'insertItemLast':
+                    if (!notEmpty(op.unitTitle)) return `${op.op}：unitTitle 不能为空`;
+                    if (!op.item || (!notEmpty(op.item.w) && op.item.id == null)) return `${op.op}：item 至少需要 w 或 id`;
+                    return '';
+                case 'insertItemAfter':
+                    if (!notEmpty(op.unitTitle)) return 'insertItemAfter：unitTitle 不能为空';
+                    if (!op.item || (!notEmpty(op.item.w) && op.item.id == null)) return 'insertItemAfter：item 至少需要 w 或 id';
+                    if (!op.afterBy || (!notEmpty(op.afterBy.w) && op.afterBy.id == null)) return 'insertItemAfter：afterBy 至少需要 w 或 id';
+                    return '';
+                case 'upsertItem':
+                    if (!notEmpty(op.unitTitle)) return 'upsertItem：unitTitle 不能为空';
+                    if (!op.item || (!notEmpty(op.item.w) && op.item.id == null)) return 'upsertItem：item 至少需要 w 或 id';
+                    if (op.pos === 'after') {
+                        if (!op.afterBy || (!notEmpty(op.afterBy.w) && op.afterBy.id == null))
+                            return 'upsertItem：pos=after 时需要提供 afterBy';
+                    }
+                    return '';
+                case 'updateItem':
+                    if (!notEmpty(op.unitTitle)) return 'updateItem：unitTitle 不能为空';
+                    if (!op.by || (!notEmpty(op.by.w) && op.by.id == null)) return 'updateItem：by 至少需要 w 或 id';
+                    if (!op.set || typeof op.set !== 'object') return 'updateItem：set 必须是对象';
+                    if (op.pos === 'after') {
+                        if (!op.afterBy || (!notEmpty(op.afterBy.w) && op.afterBy.id == null))
+                            return 'updateItem：pos=after 时需要提供 afterBy';
+                    }
+                    return '';
+                case 'removeItem':
+                    if (!notEmpty(op.unitTitle)) return 'removeItem：unitTitle 不能为空';
+                    if (!op.by || (!notEmpty(op.by.w) && op.by.id == null)) return 'removeItem：by 至少需要 w 或 id';
+                    return '';
+                default:
+                    return '未知 op';
+            }
+        }
+
+        /** ====== 组装 op（含 item.id 始终写出） ====== */
+        function buildOpFromForm() {
+            const o = state.form;
+            const base = { op: o.op };
+
+            if (o.op === 'addUnit') {
+                const u = { title: String(o.unit.title || '') };
+                if (o.unit.id !== null && String(o.unit.id).trim() !== '') u.id = toNumOrNull(o.unit.id);
+                if (Array.isArray(o.unit.list)) u.list = clone(o.unit.list);
+                base.unit = u;
+                return base;
+            }
+
+            if (o.op === 'renameUnit' || o.op === 'removeUnit') {
+                base.unitTitle = String(o.unitTitle || '');
+                if (o.op === 'renameUnit') base.toTitle = String(o.toTitle || '');
+                return base;
+            }
+
+            const readItemCommon = () => {
+                const item = {};
+                // 无论是否填写，都生成 id 字段
+                item.id = (o.item.id !== null && String(o.item.id).trim() !== '') ? toNumOrNull(o.item.id) : null;
+                if (notEmpty(o.item.w)) item.w = String(o.item.w);
+                if (notEmpty(o.item.def)) item.def = String(o.item.def);
+                if (notEmpty(o.item.tid)) item.tid = String(o.item.tid);
+                if (o.item.f !== null && String(o.item.f).trim() !== '') item.f = toNumOrNull(o.item.f);
+                return item;
+            };
+
+            if (o.op === 'insertItemFirst' || o.op === 'insertItemLast') {
+                base.unitTitle = String(o.unitTitle || '');
+                base.item = readItemCommon();
+                return base;
+            }
+
+            if (o.op === 'insertItemAfter') {
+                base.unitTitle = String(o.unitTitle || '');
+                base.item = readItemCommon();
+                const afterBy = {};
+                if (o.afterBy.id !== null && String(o.afterBy.id).trim() !== '') afterBy.id = toNumOrNull(o.afterBy.id);
+                if (notEmpty(o.afterBy.w)) afterBy.w = String(o.afterBy.w);
+                base.afterBy = afterBy;
+                return base;
+            }
+
+            if (o.op === 'upsertItem') {
+                base.unitTitle = String(o.unitTitle || '');
+                base.item = readItemCommon();
+                if (notEmpty(o.pos)) base.pos = String(o.pos);
+                if (o.pos === 'after') {
+                    const afterBy = {};
+                    if (o.afterBy.id !== null && String(o.afterBy.id).trim() !== '') afterBy.id = toNumOrNull(o.afterBy.id);
+                    if (notEmpty(o.afterBy.w)) afterBy.w = String(o.afterBy.w);
+                    base.afterBy = afterBy;
+                }
+                return base;
+            }
+
+            if (o.op === 'updateItem') {
+                base.unitTitle = String(o.unitTitle || '');
+                const by = {};
+                if (o.by.id !== null && String(o.by.id).trim() !== '') by.id = toNumOrNull(o.by.id);
+                if (notEmpty(o.by.w)) by.w = String(o.by.w);
+                base.by = by;
+
+                const set = {};
+                if (notEmpty(o.item.def)) set.def = String(o.item.def);
+                if (notEmpty(o.item.tid)) set.tid = String(o.item.tid);
+                if (o.item.f !== null && String(o.item.f).trim() !== '') set.f = toNumOrNull(o.item.f);
+                // 允许用 id/w 覆盖（id 也始终输出 null/number）
+                set.id = (o.item.id !== null && String(o.item.id).trim() !== '') ? toNumOrNull(o.item.id) : null;
+                if (notEmpty(o.item.w)) set.w = String(o.item.w);
+                base.set = set;
+
+                if (notEmpty(o.pos)) base.pos = String(o.pos);
+                if (o.pos === 'after') {
+                    const afterBy = {};
+                    if (o.afterBy.id !== null && String(o.afterBy.id).trim() !== '') afterBy.id = toNumOrNull(o.afterBy.id);
+                    if (notEmpty(o.afterBy.w)) afterBy.w = String(o.afterBy.w);
+                    base.afterBy = afterBy;
+                }
+                return base;
+            }
+
+            if (o.op === 'removeItem') {
+                base.unitTitle = String(o.unitTitle || '');
+                const by = {};
+                if (o.by.id !== null && String(o.by.id).trim() !== '') by.id = toNumOrNull(o.by.id);
+                if (notEmpty(o.by.w)) by.w = String(o.by.w);
+                base.by = by;
+                return base;
+            }
+
+            return base;
+        }
+
+        /** ====== 渲染 ====== */
+        function renderFormVisibility() {
+            const op = state.form.op;
+            // addUnit 面板
+            $('panel-addUnit').style.display = (op === 'addUnit') ? '' : 'none';
+
+            // rename/remove 面板
+            const isRR = (op === 'renameUnit' || op === 'removeUnit');
+            $('panel-rename-remove').style.display = isRR ? '' : 'none';
+            $('label-rr').textContent = op;
+            $('row-toTitle').style.display = (op === 'renameUnit') ? '' : 'none';
+
+            // items 面板
+            const needItemsPanel = ['insertItemFirst', 'insertItemLast', 'insertItemAfter', 'upsertItem', 'updateItem', 'removeItem'].includes(op);
+            $('panel-items').style.display = needItemsPanel ? '' : 'none';
+            $('label-items').textContent = op;
+
+            // 需要 item 的
+            const needItemFields = ['insertItemFirst', 'insertItemLast', 'insertItemAfter', 'upsertItem', 'updateItem'].includes(op);
+            $('section-item-fields').style.display = needItemFields ? '' : 'none';
+
+            // 需要 by 的
+            $('section-by').style.display = ['updateItem', 'removeItem'].includes(op) ? '' : 'none';
+
+            // 位置
+            $('section-pos').style.display = ['upsertItem', 'updateItem'].includes(op) ? '' : 'none';
+
+            // afterBy
+            const needAfter = (op === 'insertItemAfter') || (['upsertItem', 'updateItem'].includes(op) && state.form.pos === 'after');
+            $('section-afterBy').style.display = needAfter ? '' : 'none';
+        }
+
+        function renderOps() {
+            const listEl = $('ops-list');
+            listEl.innerHTML = '';
+            if (state.ops.length === 0) {
+                $('ops-empty').style.display = '';
+                $('btn-download').disabled = true;
+                $('btn-copy').disabled = true;
+                $('btn-clear').disabled = true;
+            } else {
+                $('ops-empty').style.display = 'none';
+                $('btn-download').disabled = false;
+                $('btn-copy').disabled = false;
+                $('btn-clear').disabled = false;
+            }
+
+            state.ops.forEach((o, i) => {
+                const wrap = document.createElement('div');
+                wrap.className = 'op-item';
+
+                const head = document.createElement('div');
+                head.className = 'op-head';
+                head.innerHTML = `
+                    <b>#${i + 1}</b>
+                    <code>${o.op}</code>
+                    <div class="spacer"></div>
+                    <button data-act="up" data-i="${i}" ${i === 0 ? 'disabled' : ''}>上移</button>
+                    <button data-act="down" data-i="${i}" ${i === state.ops.length - 1 ? 'disabled' : ''}>下移</button>
+                    <button data-act="edit" data-i="${i}">编辑</button>
+                    <button class="danger" data-act="del" data-i="${i}">删除</button>
+                    `;
+                const pre = document.createElement('pre');
+                pre.className = 'code';
+                pre.textContent = JSON.stringify(o, null, 2);
+
+                wrap.appendChild(head);
+                wrap.appendChild(pre);
+                listEl.appendChild(wrap);
+            });
+
+            // 事件委托
+            listEl.onclick = (e) => {
+                const btn = e.target.closest('button');
+                if (!btn) return;
+                const act = btn.getAttribute('data-act');
+                const i = Number(btn.getAttribute('data-i'));
+                if (act === 'up') moveUp(i);
+                else if (act === 'down') moveDown(i);
+                else if (act === 'edit') editOp(i);
+                else if (act === 'del') removeOp(i);
+            };
+        }
+
+        function renderOutput() {
+            const json = JSON.stringify({ ops: state.ops }, null, 2);
+            const show = $('show-raw').checked;
+            $('raw-json').style.display = show ? '' : 'none';
+            if (show) $('raw-json').textContent = json;
+        }
+
+        /** ====== 表单数据绑定（读取/写入） ====== */
+        function initStaticOptions() {
+            // 操作类型
+            const sel = $('opType');
+            sel.innerHTML = OP_TYPES.map(t => `<option value="${t.v}">${t.label}</option>`).join('');
+            sel.value = state.form.op;
+            sel.onchange = () => { state.form.op = sel.value; renderFormVisibility(); };
+
+            // pos
+            const psel = $('pos');
+            psel.innerHTML = POS_OPTIONS.map(p => `<option value="${p.v}">${p.label}</option>`).join('');
+            psel.value = state.form.pos;
+            psel.onchange = () => { state.form.pos = psel.value; renderFormVisibility(); };
+        }
+
+        function bindFormInputs() {
+            // addUnit
+            $('unit-id').oninput = (e) => state.form.unit.id = e.target.value;
+            $('unit-title').oninput = (e) => state.form.unit.title = e.target.value;
+            $('btn-add-unit-item').onclick = addUnitListItem;
+
+            // rr
+            $('rr-unitTitle').oninput = (e) => state.form.unitTitle = e.target.value;
+            $('rr-toTitle').oninput = (e) => state.form.toTitle = e.target.value;
+
+            // items
+            $('it-unitTitle').oninput = (e) => state.form.unitTitle = e.target.value;
+            $('item-w').oninput = (e) => state.form.item.w = e.target.value;
+            $('item-def').oninput = (e) => state.form.item.def = e.target.value;
+
+            $('by-w').oninput = (e) => state.form.by.w = e.target.value;
+            $('afterBy-w').oninput = (e) => state.form.afterBy.w = e.target.value;
+
+            $('show-raw').onchange = renderOutput;
+
+            // 主按钮
+            $('btn-add').onclick = addOp;
+            $('btn-replace').onclick = replaceOp;
+            $('btn-clear').onclick = clearAll;
+            $('btn-download').onclick = downloadJson;
+            $('btn-copy').onclick = copyJson;
+        }
+
+        function renderUnitList() {
+            const host = $('unit-list');
+            host.innerHTML = '';
+            const u = state.form.unit;
+            (u.list || []).forEach((it, i) => {
+                const div = document.createElement('div');
+                div.className = 'mini-card';
+                div.innerHTML = `
+                    <div class="row">
+                        <label>id</label><input type="number" data-k="id" data-i="${i}" value="${it.id ?? ''}" />
+                        <label>w</label><input data-k="w" data-i="${i}" value="${it.w ?? ''}" />
+                        <label>f</label><input type="number" data-k="f" data-i="${i}" value="${it.f ?? ''}" />
+                    </div>
+                    <div class="row">
+                        <label>def</label><input data-k="def" data-i="${i}" class="wide" value="${it.def ?? ''}" />
+                    </div>
+                    <div class="row">
+                        <label>tid</label><input data-k="tid" data-i="${i}" class="wide" value="${it.tid ?? ''}" />
+                    </div>
+                    <div class="row">
+                        <button class="danger" data-del="${i}">移除</button>
+                    </div>
+                    `;
+                host.appendChild(div);
+            });
+
+            host.oninput = (e) => {
+                const i = e.target.getAttribute('data-i');
+                const k = e.target.getAttribute('data-k');
+                if (i == null || !k) return;
+                const val = e.target.value;
+                const it = state.form.unit.list[Number(i)];
+                if (k === 'id' || k === 'f') it[k] = val;
+                else it[k] = val;
+            };
+            host.onclick = (e) => {
+                const btn = e.target.closest('button[data-del]');
+                if (!btn) return;
+                const i = Number(btn.getAttribute('data-del'));
+                removeUnitListItem(i);
+            };
+        }
+
+        /** ====== 动作 ====== */
+        function addOp() {
+            const draft = buildOpFromForm();
+            const err = validate(draft);
+            if (err) { toast(err); return; }
+            state.ops.push(draft);
+            state.activeIdx = state.ops.length - 1;
+            toast('已添加到列表');
+            $('btn-replace').disabled = state.activeIdx < 0;
+            renderOps(); renderOutput();
+        }
+
+        function replaceOp() {
+            if (state.activeIdx < 0 || state.activeIdx >= state.ops.length) { toast('没有正在编辑的项'); return; }
+            const draft = buildOpFromForm();
+            const err = validate(draft);
+            if (err) { toast(err); return; }
+            state.ops.splice(state.activeIdx, 1, draft);
+            toast('已更新该项');
+            renderOps(); renderOutput();
+        }
+
+        function editOp(i) {
+            const cur = clone(state.ops[i]);
+            state.activeIdx = i;
+            $('btn-replace').disabled = false;
+
+            // 重置再回填
+            state.form = {
+                op: cur.op,
+                unit: { id: null, title: '', list: [] },
+                unitTitle: '',
+                toTitle: '',
+                item: { id: null, w: '', def: '', tid: '', f: null },
+                by: { id: null, w: '' },
+                afterBy: { id: null, w: '' },
+                pos: ''
+            };
+
+            if (cur.unit) state.form.unit = clone(cur.unit);
+            if (cur.unitTitle) state.form.unitTitle = cur.unitTitle;
+            if (cur.toTitle) state.form.toTitle = cur.toTitle;
+            if (cur.item) state.form.item = Object.assign({ id: null, w: '', def: '', tid: '', f: null }, clone(cur.item));
+            if (cur.by) state.form.by = { id: cur.by.id ?? null, w: cur.by.w ?? '' };
+            if (cur.afterBy) state.form.afterBy = { id: cur.afterBy.id ?? null, w: cur.afterBy.w ?? '' };
+            if (cur.pos) state.form.pos = cur.pos;
+
+            $('opType').value = state.form.op;
+            $('pos').value = state.form.pos;
+            $('unit-id').value = state.form.unit.id ?? '';
+            $('unit-title').value = state.form.unit.title ?? '';
+            $('rr-unitTitle').value = state.form.unitTitle ?? '';
+            $('rr-toTitle').value = state.form.toTitle ?? '';
+            $('it-unitTitle').value = state.form.unitTitle ?? '';
+            $('item-w').value = state.form.item.w ?? '';
+            $('item-def').value = state.form.item.def ?? '';
+            $('by-w').value = state.form.by.w ?? '';
+            $('afterBy-w').value = state.form.afterBy.w ?? '';
+
+            renderFormVisibility();
+            renderUnitList();
+        }
+
+        function removeOp(i) {
+            state.ops.splice(i, 1);
+            if (state.activeIdx === i) state.activeIdx = -1;
+            $('btn-replace').disabled = state.activeIdx < 0;
+            renderOps(); renderOutput();
+        }
+
+        function moveUp(i) {
+            if (i <= 0) return;
+            const [x] = state.ops.splice(i, 1);
+            state.ops.splice(i - 1, 0, x);
+            renderOps(); renderOutput();
+        }
+
+        function moveDown(i) {
+            if (i >= state.ops.length - 1) return;
+            const [x] = state.ops.splice(i, 1);
+            state.ops.splice(i + 1, 0, x);
+            renderOps(); renderOutput();
+        }
+
+        function clearAll() {
+            state.ops = [];
+            state.activeIdx = -1;
+            $('btn-replace').disabled = true;
+            renderOps(); renderOutput();
+            toast('已清空');
+        }
+
+        /** ====== 导出 / 复制 ====== */
+        function outputJson() { return JSON.stringify({ ops: state.ops }, null, 2); }
+
+        function downloadJson() {
+            const blob = new Blob([outputJson()], { type: 'application/json;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = ($('file-name').value || 'units_ops_patch.json');
+            a.click();
+            URL.revokeObjectURL(a.href);
+            toast('下载已开始');
+        }
+
+        async function copyJson() {
+            try {
+                await navigator.clipboard.writeText(outputJson());
+                toast('已复制 JSON 到剪贴板');
+            } catch {
+                toast('复制失败，请手动选中复制');
+            }
+        }
+
+        /** ====== addUnit.list 辅助 ====== */
+        function addUnitListItem() {
+            if (!Array.isArray(state.form.unit.list)) state.form.unit.list = [];
+            state.form.unit.list.push({ id: null, w: '', def: '', tid: '', f: null });
+            renderUnitList();
+        }
+        function removeUnitListItem(i) {
+            if (!Array.isArray(state.form.unit.list)) return;
+            state.form.unit.list.splice(i, 1);
+            renderUnitList();
+        }
+
+        /** ====== 初始化 ====== */
+        function init() {
+            initStaticOptions();
+            bindFormInputs();
+            renderFormVisibility();
+            renderUnitList();
+            renderOps();
+            renderOutput();
+
+            // 让“下载/复制”按钮初始禁用保持一致
+            $('btn-download').disabled = true;
+            $('btn-copy').disabled = true;
+
+            // 当显示源码勾选变化时，刷新源码区
+            $('show-raw').addEventListener('change', renderOutput);
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+
+</html>

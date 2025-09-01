@@ -1,0 +1,80 @@
+name: Build Windows (debug)
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  win:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      # 长路径 & 入口检查
+      - name: Verify project layout
+        shell: pwsh
+        run: |
+          git config --global core.longpaths true
+          Write-Host "== Ensure dist/index.html & main.js exist =="
+          if (-not (Test-Path dist/index.html)) { Write-Error "dist/index.html NOT FOUND"; exit 1 }
+          if (-not (Test-Path main.js)) { Write-Error "main.js NOT FOUND"; exit 1 }
+
+      # 没 lock 就用 npm install
+      - name: Install deps (lock-aware)
+        shell: bash
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      # 先尝试生成便携版（portable/zip），绕过 NSIS 安装器
+      - name: Build portable first (smoke test)
+        env:
+          DEBUG: electron-builder
+          ELECTRON_BUILDER_DEBUG: "true"
+        run: npx electron-builder --win portable --x64 --publish=never
+
+      - name: Upload portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable
+          path: dist/*.exe
+          if-no-files-found: ignore
+
+      # 如果上一步通过，再尝试 NSIS 安装器
+      - name: Build NSIS installer
+        if: success()
+        env:
+          DEBUG: electron-builder
+          ELECTRON_BUILDER_DEBUG: "true"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win nsis --x64 --publish=never
+
+      - name: Upload NSIS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-nsis
+          path: dist/*.exe
+          if-no-files-found: error
+
+      - name: Attach to Release (when tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

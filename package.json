@@ -1,0 +1,52 @@
+{
+  "name": "my-desktop-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal Electron shell for my web app",
+  "author": "Your Name",
+  "main": "main.js",
+  "scripts": {
+    "dev": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.example.mydesktopapp",
+    "productName": "json生成器",
+    "files": [
+      "main.js",
+      "preload.js",
+      "dist/**/*",
+      "icons/*"
+    ],
+    "asar": true,
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "icons/icon.icns",
+      "artifactName": "json生成器.dmg"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "icons/icon.ico",
+      "artifactName": "json生成器.exe"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "icons"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

@@ -536,11 +536,40 @@
             }
             return null;
         }
-        function emitMoves(oldWords, tgtWords, unitTitle, ops, allowedNow) {
+        // function emitMoves(oldWords, tgtWords, unitTitle, ops, allowedNow) {
+        //     let lastPlaced = null;
+        //     for (let i = 0; i < tgtWords.length; i++) {
+        //         const w = tgtWords[i];
+        //         if (!allowedNow.has(w)) continue;
+
+        //         const prev = findPrevAllowedWord(tgtWords, i, allowedNow);
+        //         const needFirst = (prev === null);
+        //         const ok =
+        //             (needFirst && lastPlaced === null) ||
+        //             (!needFirst && lastPlaced === prev);
+
+        //         if (!ok) {
+        //             const move = { op: 'upsertItem', unitTitle, item: { id: null, w } };
+        //             if (needFirst) {
+        //                 move.pos = 'first';
+        //             } else {
+        //                 move.pos = 'after';
+        //                 move.afterBy = { w: prev };
+        //             }
+        //             ops.push(move);
+        //             lastPlaced = w;
+        //         } else {
+        //             lastPlaced = w;
+        //         }
+        //     }
+        // }
+
+        function emitMoves(oldWords, tgtWords, unitTitle, ops, allowedNow, skipMoves = new Set()) {
             let lastPlaced = null;
             for (let i = 0; i < tgtWords.length; i++) {
                 const w = tgtWords[i];
                 if (!allowedNow.has(w)) continue;
+                if (skipMoves.has(w)) continue; // ✅ 已用 updateItem(pos) 处理过的，跳过再次移动
 
                 const prev = findPrevAllowedWord(tgtWords, i, allowedNow);
                 const needFirst = (prev === null);
@@ -563,6 +592,7 @@
                 }
             }
         }
+
         function diffUnitItems(unitTitle, oldListRaw, newListRaw) {
             const ops = [];
             const oldList = normalizeList(oldListRaw);
@@ -576,15 +606,66 @@
 
             const { added, removed, common } = diffSets(oldWords, newWords);
 
+            // common.forEach(w => {
+            //     const o = oldIdx.get(w).it, n = newIdx.get(w).it;
+            //     if ((o.def ?? '') !== (n.def ?? '')) {
+            //         ops.push({
+            //             op: 'updateItem',
+            //             unitTitle,
+            //             by: { w },
+            //             set: { id: null, w, def: n.def }
+            //         });
+            //     }
+            // });
+
+            function prevOf(list, w, refSet) {
+                const pos = list.indexOf(w);
+                for (let i = pos - 1; i >= 0; i--) {
+                    const cand = list[i];
+                    if (refSet.has(cand)) return cand;
+                }
+                return null;
+            }
+
+            // 仅保留“公共且未新增/未删除”的集合，用于判断相对位置变化
+            const commonSet = new Set(common);
+
+            // 记录已经用 updateItem(pos) 处理过移动的词，避免 emitMoves 再次移动
+            const movedViaUpdate = new Set();
+
             common.forEach(w => {
-                const o = oldIdx.get(w).it, n = newIdx.get(w).it;
-                if ((o.def ?? '') !== (n.def ?? '')) {
-                    ops.push({
+                const o = oldIdx.get(w).it;
+                const n = newIdx.get(w).it;
+
+                // 逐字段比较，按需最小 set；这里示例 def/tid/f，可按你真实字段继续扩展
+                const set = { id: null, w };
+                let changed = false;
+                if ((o.def ?? '') !== (n.def ?? '')) { set.def = n.def; changed = true; }
+                if (('tid' in n) && (o.tid !== n.tid)) { set.tid = n.tid; changed = true; }
+                if (typeof n.f === 'number' && o.f !== n.f) { set.f = n.f; changed = true; }
+
+                // 检查“相对前驱”是否发生变化（仅在 common 集合里面比）
+                const oldPrev = prevOf(oldWords, w, commonSet);
+                const newPrev = prevOf(newWords, w, commonSet);
+                const positionChanged = oldPrev !== newPrev;
+
+                if (changed || positionChanged) {
+                    const upd = {
                         op: 'updateItem',
                         unitTitle,
                         by: { w },
-                        set: { id: null, w, def: n.def }
-                    });
+                        set
+                    };
+                    if (positionChanged) {
+                        if (newPrev === null) {
+                            upd.pos = 'first';
+                        } else {
+                            upd.pos = 'after';
+                            upd.afterBy = { w: newPrev };
+                        }
+                        movedViaUpdate.add(w); // ✅ 标记为已用 update 携 pos 处理
+                    }
+                    ops.push(upd);
                 }
             });
 
@@ -608,7 +689,10 @@
             removed.forEach(w => ops.push({ op: 'removeItem', unitTitle, by: { w } }));
 
             const allowedNow = new Set(newWords.filter(w => !added.includes(w)));
-            emitMoves(oldWords, newWords, unitTitle, ops, allowedNow);
+            // emitMoves(oldWords, newWords, unitTitle, ops, allowedNow);
+
+            emitMoves(oldWords, newWords, unitTitle, ops, allowedNow, movedViaUpdate);
+
 
             return ops;
         }
